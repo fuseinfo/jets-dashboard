@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+   <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/style.css" />
+    <title>Jets Dashboard</title>
+  </head>
+  <body>
+    <nav class="navbar navbar-default navbar-static-top">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">Dashboard</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav navbar-right">
+            <li class="active"><a href="#">Home</a></li>
+            <li><a href="#">About</a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-lg-3 bg-light">
+          <div class="d-none d-lg-block font-weight-bold text-center mb-4">List of Apps</div>
+          <div class='text-info' id="apps"></div>
+        </div>
+        <div class="col-lg-9" style="height: 700px;">
+          <div id="cy" style="height: 100%; width: 100%">
+            <h1 class="text-muted">Please Select an App</h1>
+          </div>
+          <input type="hidden" id="cy-refresh" value=""/>
+        </div>
+      </div>
+    </div>
+    <!-- Modal -->
+    <div class="modal fade" id="nodeModal" tabindex="-1" role="dialog" aria-labelledby="nodeModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title" id="nodeModalTitle">Modal title</h2>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div id="nodeModalEditor"></div>        
+          </div>
+          <div class="modal-footer">
+            <span id="modalMessage"></span>
+            <button type="button" class="btn btn-primary" onclick="applyEditor();">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="js/jquery-3.3.1.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/cytoscape.umd.js"></script>
+    <script src="js/dagre.min.js"></script>
+    <script src="js/cytoscape-dagre.js"></script>
+    <script src="js/jsoneditor.js"></script>
+    <script src="js/ace.js"></script>
+    <script>
+    var refreshCounts = function(cy, app) {
+      $.ajax({type:"GET",url:"/status/" + app,dataType:"json",success:function(result) {
+        $.each(result, function(index, element) {
+          cy.edges('[id="' + element.name + '"]').data('label', '' + element.average + '/s\n' + element.total);
+        });
+      }});
+      $.ajax({type:"GET",url:"/client/" + app,dataType:"json",success:function(result) {
+          var inner = "<ul>";
+          $.each(result, function(index, element) {
+        	  inner += "<li class='";
+            if (element.heartbeat > 60000) {
+              inner += "text-red";
+            } else if (element.heartbeat > 10000) {
+              inner += "text-gold";
+            } else inner += "text-green";
+            inner += "'>" + element.name + "</li>";
+          });
+          inner += "</ul>";
+          document.getElementById('clients').innerHTML=inner;
+        }});
+    }
+    
+    function showDAG(event, app) {
+    	try {
+    	  var oldFresh = $("#cy-refresh").val();
+    	  if (oldFresh != "") clearInterval(oldFresh);
+    	} catch(err){};
+      var graphText = $.ajax({type:"GET",url:"/graph/" + app,dataType:"json",async:false}).responseText;
+      var json = JSON.parse(graphText);
+      document.getElementById('cy').innerHTML="";
+      $(".btn-app.btn-primary").removeClass("btn-primary").addClass("btn-secondary");
+      $(event).removeClass("btn-secondary").addClass("btn-primary");
+      var cy = cytoscape({
+        container: document.getElementById('cy'),
+        elements: json,
+        layout: {name: 'dagre', rankDir:'LR'},
+        style: [{
+          selector: 'node',
+          style: {'border-color': 'blue',"text-wrap":"wrap","shape":"round-rectangle","text-max-width":"56","width":"60","height":"40","text-valign":"center","font-size":"8", "background-opacity":"0", "border-width":"1","border-style":"solid",label: 'data(id)'}
+        },{
+          "selector": "edge",
+          "style": {"width": 1, "font-size":"8","text-wrap":"wrap", "curve-style": "bezier", "label" : 'data(label)', 'target-arrow-shape': 'triangle','arrow-scale':'0.5'}
+        }]
+      });
+      cy.on('cxttap','node', function(event){
+    	  $('#nodeModal').modal('show');
+    	  var nodeName = event.target.data().id;
+    	  $("#nodeModalTitle").text(nodeName);
+    	  createEditor(app, nodeName);
+      });
+      $('#cy').append("<div id='clients' style='margin:-700px 0;'></div>");
+      refreshCounts(cy, app);
+      var id = setInterval(refreshCounts,2000, cy, app);
+      $("#cy-refresh").val(id);
+    }
+    
+    function listApps() {
+    	$.ajax({type:"GET",url:"/list/app",dataType:"json",success:function(result) {
+        var inner = "";
+    		$.each(result, function(index, element) {
+          inner += "<button class=\"btn btn-secondary btn-block btn-app\" href=\"#\" onclick=\"showDAG(this, '" + element + "');\">" + element + "</button>";
+        });
+    		document.getElementById('apps').innerHTML = inner;
+      }});
+    }
+    
+    function showApp(appName) {
+    	return '<div class="btn-group"><button type="button" class="btn btn-secondary btn-block btn-app" href="" onclick="showDAG(this,\'' +
+    			appName + '\');">"' + appName + '<button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">' +
+    			'<span class="caret"></span><span class="sr-only">Toggle Dropdown</span></button><ul class="dropdown-menu"><li><a href="#">Delete</a></li></ul></div>';
+    }
+    
+    var editorInstance;
+    var editorApp;
+    var editorNode;
+    
+    function createEditor(app, node) {
+      var schemaText = $.ajax({type:"GET",url:"/nodeSchema/" + app + "/" + node,dataType:"json",async:false}).responseText;
+      var json = JSON.parse(schemaText);
+      var defText = $.ajax({type:"GET",url:"/nodeDef/" + app + "/" + node,dataType:"json",async:false}).responseText;
+      JSONEditor.defaults.options.theme = 'bootstrap3';
+      JSONEditor.defaults.options.iconlib = "bootstrap3";
+      JSONEditor.defaults.options.disable_edit_json = true;
+      JSONEditor.defaults.options.display_required_only = true;
+      document.getElementById("nodeModalEditor").innerHTML="";
+      var editor = new JSONEditor(document.getElementById("nodeModalEditor"),{
+        schema: json
+      });
+      editor.setValue(JSON.parse(defText));
+      editorInstance = editor;
+      editorApp = app;
+      editorNode = node;
+      document.getElementById("modalMessage").innerHTML = "";
+    }
+    
+    function applyEditor() {
+      var data = editorInstance.getValue();
+      document.getElementById("modalMessage").innerHTML = "";
+      $.ajax({type:"POST",url:"/nodeDef/" + editorApp + "/" + editorNode,contentType:"application/json",data:JSON.stringify(data), async:true, success: function(text) {
+        var messageLine = document.getElementById("modalMessage");
+        messageLine.className = "text-success pull-left"; 
+        messageLine.innerText=text;
+      }, error: function(xhr){
+    	var messageLine = document.getElementById("modalMessage");
+        messageLine.className = "text-danger pull-left"; 
+        messageLine.innerText=xhr.responseText;
+      }});
+    }
+    $(window).on('load', function() {
+    	listApps();
+    });
+    </script>
+  </body>
+</html>

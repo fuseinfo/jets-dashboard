@@ -1,0 +1,11 @@
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+/data
+.classpath
+.factorypath
+.project
+.settings
+.idea
+*.iws
+*.iml
+*.ipr

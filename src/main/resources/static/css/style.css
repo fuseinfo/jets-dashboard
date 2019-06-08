@@ -1,0 +1,36 @@
+.container-fluid {
+	margin-right: auto;
+	margin-left: auto;
+	max-width: 1600px;
+}
+
+#cy {
+	background-size: 32px 32px;
+	background-image: radial-gradient(circle, #000000 1px, rgba(0,0,0, 0) 1px);
+}
+
+.overlay {
+  position: relative; /* Sit on top of the page content */
+  display: block; /* Hidden by default */
+  width: 100%; /* Full width (cover the whole page) */
+  height: 100%; /* Full height (cover the whole page) */
+  top: 0; 
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0,0,0,0); /* Black background with opacity */
+  z-index: 2; /* Specify a stack order in case you're using a different order for other elements */
+  cursor: pointer; /* Add a pointer on hover */
+}
+
+.text-red {
+	color: #ff0000!important;
+}
+
+.text-gold {
+  color: #ffd700!important;
+}
+
+.text-green {
+  color: #008000!important;
+}
